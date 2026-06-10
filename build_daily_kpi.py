@@ -1,192 +1,145 @@
-import os
+"""Build daily operations KPIs from the Olist e-commerce dataset."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
 import pandas as pd
 
-# =========================
-# 0) Path config
-# =========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-ORDERS_FILE   = os.path.join(BASE_DIR, "olist_orders_dataset.csv")
-ITEMS_FILE    = os.path.join(BASE_DIR, "olist_order_items_dataset.csv")
-PAYMENTS_FILE = os.path.join(BASE_DIR, "olist_order_payments_dataset.csv")  # optional
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent
 
-# Output (production-friendly names)
-OUT_CSV  = os.path.join(BASE_DIR, "daily_ops_metrics.csv")
-OUT_XLSX = os.path.join(BASE_DIR, "daily_ops_metrics.xlsx")
 
-# =========================
-# 1) Load orders (minimal cols)
-# =========================
-if not os.path.exists(ORDERS_FILE):
-    raise FileNotFoundError(f"Missing: {ORDERS_FILE}")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
+    parser.add_argument("--output-csv", type=Path, default=DEFAULT_DATA_DIR / "daily_ops_metrics.csv")
+    parser.add_argument("--output-xlsx", type=Path, default=DEFAULT_DATA_DIR / "daily_ops_metrics.xlsx")
+    return parser.parse_args()
 
-orders = pd.read_csv(
-    ORDERS_FILE,
-    usecols=[
-        "order_id",
-        "order_status",
-        "order_purchase_timestamp",
-        "order_delivered_customer_date",
-    ],
-)
 
-orders["order_purchase_timestamp"] = pd.to_datetime(
-    orders["order_purchase_timestamp"], errors="coerce"
-)
-orders["purchase_date"] = orders["order_purchase_timestamp"].dt.date
+def require_file(path: Path) -> Path:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing required file: {path}")
+    return path
 
-# Use full available range (simulation mode B needs full history)
-orders = orders.dropna(subset=["order_purchase_timestamp"]).copy()
-if orders.empty:
-    raise ValueError("No valid order_purchase_timestamp after parsing.")
 
-min_ts = orders["order_purchase_timestamp"].min()
-max_ts = orders["order_purchase_timestamp"].max()
-print(f"Data coverage (orders): {min_ts} -> {max_ts}")
+def build_daily_kpis(data_dir: Path) -> pd.DataFrame:
+    orders_file = require_file(data_dir / "olist_orders_dataset.csv")
+    items_file = require_file(data_dir / "olist_order_items_dataset.csv")
+    payments_file = data_dir / "olist_order_payments_dataset.csv"
 
-# =========================
-# 2) Load items (minimal cols) and join to orders
-# =========================
-if not os.path.exists(ITEMS_FILE):
-    raise FileNotFoundError(f"Missing: {ITEMS_FILE}")
-
-items = pd.read_csv(
-    ITEMS_FILE,
-    usecols=["order_id", "price", "freight_value"],
-)
-
-# Keep only items that belong to orders we have
-items = items.merge(
-    orders[["order_id", "purchase_date"]],
-    on="order_id",
-    how="inner",
-)
-
-# Items-based revenue definition (includes freight as you did)
-items["item_revenue"] = items["price"].fillna(0) + items["freight_value"].fillna(0)
-
-daily_revenue_items = (
-    items.groupby("purchase_date", as_index=False)["item_revenue"]
-    .sum()
-    .rename(columns={"purchase_date": "date", "item_revenue": "revenue_items"})
-)
-
-# =========================
-# 3) Daily orders + canceled orders
-# =========================
-# Note: canceled_orders here = count of orders whose status is canceled/unavailable
-orders_daily = (
-    orders.groupby("purchase_date", as_index=False)
-    .agg(
-        orders_count=("order_id", "nunique"),
-        canceled_orders=("order_status", lambda s: (s.isin(["canceled", "unavailable"])).sum()),
+    orders = pd.read_csv(
+        orders_file,
+        usecols=[
+            "order_id",
+            "order_status",
+            "order_purchase_timestamp",
+            "order_delivered_customer_date",
+        ],
     )
-    .rename(columns={"purchase_date": "date"})
-)
+    orders["order_purchase_timestamp"] = pd.to_datetime(
+        orders["order_purchase_timestamp"], errors="coerce"
+    )
+    orders = orders.dropna(subset=["order_purchase_timestamp"]).copy()
+    if orders.empty:
+        raise ValueError("No valid order_purchase_timestamp values found.")
 
-# =========================
-# 4) (Optional) Payments-based revenue
-# =========================
-has_payments = os.path.exists(PAYMENTS_FILE)
-
-if has_payments:
-    payments = pd.read_csv(PAYMENTS_FILE, usecols=["order_id", "payment_value"])
-
-    payments = payments.merge(
-        orders[["order_id", "purchase_date"]],
-        on="order_id",
-        how="inner",
+    orders["purchase_date"] = orders["order_purchase_timestamp"].dt.date
+    print(
+        "Data coverage:",
+        orders["order_purchase_timestamp"].min(),
+        "to",
+        orders["order_purchase_timestamp"].max(),
     )
 
-    daily_revenue_payments = (
-        payments.groupby("purchase_date", as_index=False)["payment_value"]
+    items = pd.read_csv(items_file, usecols=["order_id", "price", "freight_value"])
+    items = items.merge(orders[["order_id", "purchase_date"]], on="order_id", how="inner")
+    items["item_revenue"] = items["price"].fillna(0) + items["freight_value"].fillna(0)
+
+    daily_revenue_items = (
+        items.groupby("purchase_date", as_index=False)["item_revenue"]
         .sum()
-        .rename(columns={"purchase_date": "date", "payment_value": "revenue_payments"})
+        .rename(columns={"purchase_date": "date", "item_revenue": "revenue_items"})
     )
-else:
-    daily_revenue_payments = None
 
-# =========================
-# 5) Combine into final daily KPI
-# =========================
-daily = orders_daily.merge(daily_revenue_items, on="date", how="left")
+    orders_daily = (
+        orders.groupby("purchase_date", as_index=False)
+        .agg(
+            orders_count=("order_id", "nunique"),
+            canceled_orders=(
+                "order_status",
+                lambda status: status.isin(["canceled", "unavailable"]).sum(),
+            ),
+        )
+        .rename(columns={"purchase_date": "date"})
+    )
 
-if daily_revenue_payments is not None:
-    daily = daily.merge(daily_revenue_payments, on="date", how="left")
+    daily = orders_daily.merge(daily_revenue_items, on="date", how="left")
 
-# Choose one "official revenue" for anomaly detection
-# - If payments exist, prefer payments as official (cash-based-ish)
-# - Else fall back to items
-if has_payments:
-    daily["revenue"] = daily["revenue_payments"].fillna(0)
-else:
-    daily["revenue"] = daily["revenue_items"].fillna(0)
+    if payments_file.exists():
+        payments = pd.read_csv(payments_file, usecols=["order_id", "payment_value"])
+        payments = payments.merge(
+            orders[["order_id", "purchase_date"]], on="order_id", how="inner"
+        )
+        daily_revenue_payments = (
+            payments.groupby("purchase_date", as_index=False)["payment_value"]
+            .sum()
+            .rename(columns={"purchase_date": "date", "payment_value": "revenue_payments"})
+        )
+        daily = daily.merge(daily_revenue_payments, on="date", how="left")
+        daily["revenue"] = daily["revenue_payments"].fillna(0)
+    else:
+        daily["revenue"] = daily["revenue_items"].fillna(0)
 
-daily["avg_order_value"] = (daily["revenue"] / daily["orders_count"]).round(2)
+    daily["date"] = pd.to_datetime(daily["date"])
+    full_range = pd.date_range(start=daily["date"].min(), end=daily["date"].max(), freq="D")
+    daily = (
+        daily.set_index("date")
+        .reindex(full_range)
+        .reset_index()
+        .rename(columns={"index": "date"})
+    )
 
-# Format date as ISO string
-daily["date"] = pd.to_datetime(daily["date"]).dt.strftime("%Y-%m-%d")
+    for column in [
+        "orders_count",
+        "revenue",
+        "canceled_orders",
+        "revenue_items",
+        "revenue_payments",
+    ]:
+        if column in daily.columns:
+            daily[column] = daily[column].fillna(0)
 
-# Sort
-daily = daily.sort_values("date").reset_index(drop=True)
+    daily["avg_order_value"] = daily.apply(
+        lambda row: round(row["revenue"] / row["orders_count"], 2)
+        if row["orders_count"] > 0
+        else 0,
+        axis=1,
+    )
+    daily["date"] = daily["date"].dt.strftime("%Y-%m-%d")
 
-# =========================
-# 6) Basic sanity checks
-# =========================
-# =========================
-# 6.5) Fill missing calendar days (calendar spine)
-# =========================
-daily["date"] = pd.to_datetime(daily["date"])
+    columns = ["date", "orders_count", "revenue", "canceled_orders", "avg_order_value"]
+    for audit_column in ["revenue_items", "revenue_payments"]:
+        if audit_column in daily.columns:
+            columns.append(audit_column)
 
-# Build full calendar range
-full_range = pd.date_range(
-    start=daily["date"].min(),
-    end=daily["date"].max(),
-    freq="D"
-)
+    return daily[columns].sort_values("date").reset_index(drop=True)
 
-daily = (
-    daily.set_index("date")
-         .reindex(full_range)
-         .reset_index()
-         .rename(columns={"index": "date"})
-)
 
-# Fill missing days with zeros
-zero_cols = ["orders_count", "revenue", "canceled_orders", "avg_order_value"]
-for c in zero_cols:
-    if c in daily.columns:
-        daily[c] = daily[c].fillna(0)
+def main() -> None:
+    args = parse_args()
+    daily = build_daily_kpis(args.data_dir)
 
-# Fill audit columns if they exist
-for c in ["revenue_items", "revenue_payments"]:
-    if c in daily.columns:
-        daily[c] = daily[c].fillna(0)
+    daily.to_csv(args.output_csv, index=False)
+    daily.to_excel(args.output_xlsx, index=False)
 
-# Recompute AOV safely
-daily["avg_order_value"] = daily.apply(
-    lambda r: round(r["revenue"] / r["orders_count"], 2)
-    if r["orders_count"] > 0 else 0,
-    axis=1
-)
+    print("Done")
+    print(f"Rows: {len(daily)}")
+    print(f"CSV: {args.output_csv}")
+    print(f"XLSX: {args.output_xlsx}")
 
-# Back to string date
-daily["date"] = daily["date"].dt.strftime("%Y-%m-%d")
 
-cols = ["date", "orders_count", "revenue", "canceled_orders", "avg_order_value"]
-if has_payments:
-    cols += ["revenue_items", "revenue_payments"]
-
-daily = daily[cols]
-
-# =========================
-# 7) Export
-# =========================
-daily.to_csv(OUT_CSV, index=False)
-daily.to_excel(OUT_XLSX, index=False)
-
-print("✅ Done!")
-print(f"- Rows (days): {len(daily)}")
-print(f"- Output CSV : {OUT_CSV}")
-print(f"- Output XLSX: {OUT_XLSX}")
-print(f"- Payments file found: {has_payments}")
+if __name__ == "__main__":
+    main()

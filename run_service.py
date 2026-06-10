@@ -1,37 +1,55 @@
-from flask import Flask, request, jsonify
-import subprocess
+"""Small Flask wrapper for triggering the anomaly detector from n8n."""
+
+from __future__ import annotations
+
 import os
+import subprocess
+import sys
+from pathlib import Path
+
+from flask import Flask, jsonify, request
+
 
 app = Flask(__name__)
+BASE_DIR = Path(__file__).resolve().parent
+SCRIPT = BASE_DIR / "detect_anomalies.py"
+TOKEN = os.getenv("OPS_AGENT_TOKEN")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SCRIPT = os.path.join(BASE_DIR, "detect_anomalies.py")
-
-# 简单鉴权：防止别人随便触发你本地脚本
-TOKEN = os.environ.get("OPS_AGENT_TOKEN", "kiren-ops-123")
 
 @app.get("/health")
 def health():
     return jsonify({"ok": True})
 
+
 @app.post("/run")
 def run():
+    if not TOKEN:
+        return jsonify({"error": "OPS_AGENT_TOKEN is not configured"}), 500
+
     if request.headers.get("X-OPS-TOKEN", "") != TOKEN:
         return jsonify({"error": "unauthorized"}), 401
 
     result = subprocess.run(
-        ["python3", SCRIPT],
+        [sys.executable, str(SCRIPT)],
         cwd=BASE_DIR,
         capture_output=True,
         text=True,
-        timeout=120
+        timeout=120,
+        check=False,
     )
 
-    return jsonify({
-        "exit_code": result.returncode,
-        "stdout": result.stdout[-4000:],
-        "stderr": result.stderr[-4000:],
-    }), 200
+    status_code = 200 if result.returncode == 0 else 500
+    return (
+        jsonify(
+            {
+                "exit_code": result.returncode,
+                "stdout": result.stdout[-4000:],
+                "stderr": result.stderr[-4000:],
+            }
+        ),
+        status_code,
+    )
+
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5001)
