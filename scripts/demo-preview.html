@@ -19,14 +19,27 @@ thead th{font-size:.7rem;color:var(--muted);letter-spacing:.06em;text-transform:
 footer{margin-top:auto;color:var(--muted);padding-top:4px;font-size:.8rem}code{overflow-wrap:anywhere}
 .note{background:#f8fbfe;border:1px solid var(--line);border-radius:11px;padding:14px 17px;color:#41556f;font-size:.85rem}.note p{margin:3px 0}
 a{color:#255780;text-underline-offset:3px}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}.nav a{background:#e4edf6;color:#24476e;padding:5px 9px;border-radius:6px;font-size:.79rem}
+.history{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 14px}
+.history h2{font-size:1.15rem}.history ol{margin:.5rem 0 .1rem;padding-left:1.3rem}.history li{margin:.28rem 0;color:#41556f;font-size:.86rem}
+.history b{color:#12233a}
 @media(max-width:850px){.grid{grid-template-columns:1fr}}@media(max-width:450px){main{padding:14px 9px}.hero{padding:23px 15px}.card{padding:16px 10px}th,td{padding:7px 3px;font-size:.77rem}thead th{font-size:.65rem}}
 </style></head><body><main><header class="hero"><div class="eyebrow">Auto · End-to-end demo</div><h1>Daily operations monitor</h1>
 <p>Synthetic small online retailer · $timezone · $currency</p>
 <div class="facts"><span>$days completed business days</span><span>$orders orders</span>
 <span>$items line items</span><span>$payment_records payment records</span></div></header>
+<nav class="nav" aria-label="Demo sections"><a href="#normal">Daily report</a><a href="#alert">Exception alert</a><a href="#history">Delivery history</a></nav>
 <div class="grid">$normal_card$alert_card</div>
+<section class="history" id="history">
+<h2>Delivery history</h2>
+<ol>
+<li><b>Normal day saved.</b> The monitor recorded the report without sending a webhook.</li>
+<li><b>First alert attempt failed.</b> The scheduled run received HTTP $failed_http and saved the event as pending.</li>
+<li><b>Retry delivered.</b> A manual trigger retried the same event and the receiver returned HTTP $delivered_http.</li>
+<li><b>Duplicate skipped.</b> A repeat request returned <code>$repeat_status</code>. The receiver accepted $deliveries alert and the history contains $history_count reports.</li>
+</ol>
+</section>
 <aside class="note">
 <p>The monitor compares each day with the prior seven calendar days. Revenue uses captured payments. Average order value divides revenue by all orders, including cancellations.</p>
-<p>A repeat trigger returned <code>$repeat_status</code>. The receiver recorded $deliveries webhook delivery.</p>
-<p><a href="normal-report.txt">Original daily report</a> · <a href="webhook-alert.json">Original webhook payload</a> · <a href="daily_ops_metrics.xlsx">42-day KPI workbook</a></p>
+<p><a href="normal-report.txt">Original daily report</a> · <a href="webhook-alert.json">Original webhook payload</a> · <a href="daily_ops_metrics.xlsx">42-day KPI workbook</a> · <a href="run-results.json">Run record JSON</a></p>
 </aside></main></body></html>

@@ -1,0 +1,100 @@
+{
+  "id": "AutoAlertsN8nDemo",
+  "name": "Auto · Alert inbox",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auto-monitor/alerts",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9bf87c65-7321-5bd8-bf1e-9d3774c53b2b",
+      "name": "Receive Auto alert",
+      "webhookId": "9805f65a-b3d2-5d42-ad5d-0799d2bca399",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AutoAlertBearer",
+          "name": "Auto Alert Bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ event_id: $json.body.event_id, date: $json.body.date, status: $json.body.status, signal_count: $json.body.signals_count, signals: $json.body.signals, summary: $json.body.summary }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        270,
+        0
+      ],
+      "id": "12a2654a-721a-5d37-9be0-00ea6db08c10",
+      "name": "Record alert details"
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "AutoRegistryN8nDemo"
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        535,
+        0
+      ],
+      "id": "bb54148b-6407-5bf4-a7f0-cf1d13c84542",
+      "name": "Register incident"
+    }
+  ],
+  "connections": {
+    "Receive Auto alert": {
+      "main": [
+        [
+          {
+            "node": "Record alert details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record alert details": {
+      "main": [
+        [
+          {
+            "node": "Register incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Chicago",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

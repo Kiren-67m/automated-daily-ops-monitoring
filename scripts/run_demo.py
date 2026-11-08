@@ -104,13 +104,14 @@ def main():
                     "--output-csv", str(metrics), "--output-xlsx", str(output / "daily_ops_metrics.xlsx")],
                    cwd=ROOT, check=True)
 
-    alerts = []
+    attempts = []
     received = Event()
     class Receiver(BaseHTTPRequestHandler):
         def do_POST(self):
             message = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            alerts.append((message, self.headers.get("Idempotency-Key")))
-            self.send_response(204)
+            status = 503 if not attempts else 204
+            attempts.append((message, self.headers.get("Idempotency-Key"), status))
+            self.send_response(status)
             self.end_headers()
             received.set()
 
@@ -131,7 +132,7 @@ def main():
         report = json.loads(subprocess.check_output([sys.executable, "detect_anomalies.py",
                              "--date", str(normal_day)], cwd=ROOT, env=env, text=True))
         assert report["status"] == "normal", report["summary"]
-        assert not alerts
+        assert not attempts
         with socket.socket() as port:
             port.bind(("127.0.0.1", 0))
             service_port = port.getsockname()[1]
@@ -139,29 +140,42 @@ def main():
         with (output / "service.log").open("w", encoding="utf-8") as log:
             process = subprocess.Popen([sys.executable, "run_service.py"], cwd=ROOT, env=env, stdout=log, stderr=log)
             try:
-                assert received.wait(30), "The scheduled run did not send an alert. Inspect service.log."
-                assert len(alerts) == 1
-                alert, key = alerts[0]
-                assert alert["date"] == incident_day.isoformat() and alert["status"] == "anomaly_detected"
-                assert key == alert["event_id"]
+                assert received.wait(30), "The scheduled run did not reach the webhook. Inspect service.log."
                 base_url = f"http://127.0.0.1:{service_port}"
+                headers = {"X-OPS-TOKEN": token}
                 with requests.Session() as client:
                     client.trust_env = False
                     for _ in range(100):
                         try:
-                            healthy = client.get(base_url + "/health", timeout=1).json() == {"ok": True, "mode": "live"}
+                            response = client.get(base_url + "/reports", params={"date": str(incident_day)},
+                                                  headers=headers, timeout=1)
                         except requests.ConnectionError:
-                            healthy = False
-                        if healthy and state.exists():
-                            if str(incident_day) in state.read_text(encoding="utf-8"):
-                                duplicate = client.post(base_url + "/run", headers={"X-OPS-TOKEN": token}, timeout=5)
-                                if duplicate.status_code != 409:
-                                    break
+                            time.sleep(0.05)
+                            continue
+                        if response.ok and response.json()["report"]["delivery"] == "retry_pending":
+                            retry = client.post(base_url + "/run", headers=headers, timeout=5)
+                            if retry.status_code != 409:
+                                break
                         time.sleep(0.05)
                     else:
-                        raise RuntimeError("The service did not complete the scheduled run. Inspect service.log.")
-                assert duplicate.status_code == 200 and duplicate.json()["result"]["status"] == "already_processed"
-                assert len(alerts) == 1
+                        raise RuntimeError("The failed attempt was not saved. Inspect service.log.")
+                    assert retry.ok, retry.text
+                    history_response = client.get(base_url + "/reports", headers=headers, timeout=5)
+                    history_response.raise_for_status()
+                    history = history_response.json()["reports"]
+                    report_response = client.get(base_url + "/reports", params={"date": str(incident_day)},
+                                                 headers=headers, timeout=5)
+                    report_response.raise_for_status()
+                    incident_report = report_response.json()["report"]
+                    duplicate = client.post(base_url + "/run", headers=headers, timeout=5)
+                assert duplicate.ok and duplicate.json()["result"]["status"] == "already_processed"
+                assert len(attempts) == 2
+                alert, key, status = attempts[-1]
+                assert status == 204 and attempts[0] == (alert, key, 503)
+                assert alert["date"] == incident_day.isoformat() and alert["status"] == "anomaly_detected"
+                assert key == alert["event_id"]
+                assert incident_report["payload"] == alert
+                assert [item["delivery"] for item in history] == ["delivered", "not_needed"]
             finally:
                 process.terminate()
                 try:
@@ -177,7 +191,10 @@ def main():
         "normal_report": report,
         "received_webhook": {"http_status": 204, "idempotency_key": key, "payload": alert},
         "webhook_calls_for_normal_day": 0,
-        "total_webhook_calls": len(alerts),
+        "total_webhook_calls": len(attempts),
+        "successful_deliveries": sum(status == 204 for _, _, status in attempts),
+        "history": history,
+        "alert_attempts": incident_report["attempts"],
         "repeat_run": duplicate.json()["result"],
     }
     for name, value in [("run-results.json", results), ("normal-report.json", report), ("webhook-alert.json", alert)]:
@@ -187,7 +204,8 @@ def main():
     print(json.dumps(results["dataset"], indent=2))
     print("\nNormal daily report\n" + report["summary"])
     print("\nReceived alert\n" + alert["summary"])
-    print(f"\nWebhook deliveries: {len(alerts)}. Repeat result: {results['repeat_run']['status']}.")
+    print(f"\nWebhook HTTP responses: {[status for _, _, status in attempts]}. "
+          f"Repeat result: {results['repeat_run']['status']}.")
     print(f"Open {output / 'demo-preview.html'} to compare both outputs.")
 
 

@@ -1,0 +1,197 @@
+{
+  "id": "AutoQueueN8nDemo",
+  "name": "Auto · Incident queue",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "auto-monitor/incidents",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -85
+      ],
+      "id": "64a29595-18eb-5333-b3b4-2fe0065c2bb9",
+      "name": "Read active incidents",
+      "webhookId": "b62d34b4-abe8-5bf0-a431-ac71cecb10a9",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AutoOperatorToken",
+          "name": "Auto Operator Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        85
+      ],
+      "id": "81defd07-2822-5552-b835-8a023e9207de",
+      "name": "Queue input"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"ensure_only\": true}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ],
+      "id": "e7d49b00-46b3-57fc-a903-2008594fd596",
+      "name": "Request incident storage"
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "AutoRegistryN8nDemo"
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        510,
+        0
+      ],
+      "id": "c58ef49b-f72a-58d5-9e76-ebe51586f8f5",
+      "name": "Ensure registry is ready"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "auto_ops_incidents"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "isEmpty"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "acknowledged"
+            }
+          ]
+        },
+        "returnAll": true,
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "ASC"
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        760,
+        0
+      ],
+      "id": "2487f513-8dd2-5bfd-a78b-19ebb643c03a",
+      "name": "Get open and acknowledged rows",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(item => item.json).filter(row => row.id != null);\nconst incidents = rows.map(row => ({\n  incident_id: row.id,\n  event_id: row.event_id,\n  date: row.business_date,\n  status: row.status || 'open',\n  severity: row.severity,\n  created_at: row.createdAt,\n  acknowledged_by: row.acknowledged_by,\n  signal_count: row.signal_count,\n}));\nreturn [{ json: { active_count: incidents.length, incidents } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1010,
+        0
+      ],
+      "id": "344c1bc2-b50f-507f-a6a1-abc183757dba",
+      "name": "Return active queue"
+    }
+  ],
+  "connections": {
+    "Read active incidents": {
+      "main": [
+        [
+          {
+            "node": "Request incident storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue input": {
+      "main": [
+        [
+          {
+            "node": "Request incident storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request incident storage": {
+      "main": [
+        [
+          {
+            "node": "Ensure registry is ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure registry is ready": {
+      "main": [
+        [
+          {
+            "node": "Get open and acknowledged rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get open and acknowledged rows": {
+      "main": [
+        [
+          {
+            "node": "Return active queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Chicago",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

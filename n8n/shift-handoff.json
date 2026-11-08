@@ -1,0 +1,348 @@
+{
+  "id": "AutoHandoffN8nDemo",
+  "name": "Auto · Shift handoff",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 16,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -144
+      ],
+      "id": "31c55795-7027-53ce-8647-6d2929626234",
+      "name": "Daily at 16:30"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6619ba19-2077-560c-878d-8f9b581d4408",
+      "name": "Handoff manually"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "auto-monitor/handoff",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        144
+      ],
+      "id": "24d6836c-117e-59f2-b857-97f99a3efc54",
+      "name": "Read handoff now",
+      "webhookId": "9d9f54f5-215b-5b49-9558-42b05063946c",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AutoOperatorToken",
+          "name": "Auto Operator Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "AutoQueueN8nDemo"
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        0
+      ],
+      "id": "66845579-802c-5640-97b1-ba9a4f8a7f5a",
+      "name": "Read incident queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { incidents } = $input.first().json;\nconst now = new Date();\nconst pending = incidents.map(incident => ({\n  ...incident,\n  age_hours: Math.max(0, Math.floor((now - new Date(incident.created_at)) / 3600000)),\n  next_action: incident.status === 'open' ? 'Assign an operator' : 'Follow up with the assigned operator',\n})).sort((a, b) => {\n  const priority = Number(b.severity === 'high') - Number(a.severity === 'high');\n  return priority || a.created_at.localeCompare(b.created_at);\n});\nreturn [{ json: {\n  generated_at: now.toISOString(),\n  active_count: pending.length,\n  open_count: pending.filter(incident => incident.status === 'open').length,\n  acknowledged_count: pending.filter(incident => incident.status === 'acknowledged').length,\n  high_priority_count: pending.filter(incident => incident.severity === 'high').length,\n  older_than_24h_count: pending.filter(incident => incident.age_hours >= 24).length,\n  priority_queue: pending,\n  escalation_event_ids: pending.filter(incident =>\n    incident.age_hours >= 24 || (incident.severity === 'high' && incident.status === 'open')\n  ).map(incident => incident.event_id),\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "0d0d46f0-5eb9-5d86-bf4a-f5b41f9d68b9",
+      "name": "Rank incidents and count workload"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "736ad2f8-4baf-53ef-bf6f-d8cc4885e616",
+              "leftValue": "={{ $json.active_count > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "79d36ae0-3b01-587c-8fca-727d6ca55f28",
+      "name": "Any active incidents?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6050b672-c906-5cef-881c-ee451d5e94eb",
+              "leftValue": "={{ $json.escalation_event_ids.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        -144
+      ],
+      "id": "b2893aee-1e48-5677-981a-ac703a402b64",
+      "name": "Immediate follow-up needed?"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ handoff_status: 'escalate', summary: 'Escalate ' + $json.escalation_event_ids.length + ' unclaimed high-severity or overdue incident(s): ' + $json.escalation_event_ids.join(', ') }) }}",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        -240
+      ],
+      "id": "6f9de98c-4e3e-58ee-a484-6d410ed76a2f",
+      "name": "Prepare escalation brief"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ handoff_status: 'follow_up', summary: 'Follow up on ' + $json.active_count + ' active incident(s). ' + $json.acknowledged_count + ' acknowledged, ' + $json.open_count + ' awaiting assignment.' }) }}",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        -48
+      ],
+      "id": "252160af-064d-5d16-8d4c-128752d580fd",
+      "name": "Prepare owner follow-up"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"handoff_status\":\"clear\",\"summary\":\"All clear. No open or acknowledged incidents.\"}",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        144
+      ],
+      "id": "04155abe-49f7-592b-b5a7-2f0caa146dbf",
+      "name": "Prepare all-clear"
+    },
+    {
+      "parameters": {
+        "content": "## 01 · Read the active queue\nScheduled, manual, or on-demand handoff.",
+        "width": 440,
+        "height": 496,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -240
+      ],
+      "id": "402fd6f8-5493-5452-82a8-d8808fc9d5fa",
+      "name": "Handoff input"
+    },
+    {
+      "parameters": {
+        "content": "## 02 · Prepare the right handoff\nEscalate unclaimed high-severity or overdue work, follow up with owners, or record all clear.",
+        "width": 924,
+        "height": 594,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        398,
+        -330
+      ],
+      "id": "d6aa9f5a-328d-5282-913b-85af58276471",
+      "name": "Handoff decision"
+    }
+  ],
+  "connections": {
+    "Daily at 16:30": {
+      "main": [
+        [
+          {
+            "node": "Read incident queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handoff manually": {
+      "main": [
+        [
+          {
+            "node": "Read incident queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read handoff now": {
+      "main": [
+        [
+          {
+            "node": "Read incident queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read incident queue": {
+      "main": [
+        [
+          {
+            "node": "Rank incidents and count workload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank incidents and count workload": {
+      "main": [
+        [
+          {
+            "node": "Any active incidents?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any active incidents?": {
+      "main": [
+        [
+          {
+            "node": "Immediate follow-up needed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare all-clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Immediate follow-up needed?": {
+      "main": [
+        [
+          {
+            "node": "Prepare escalation brief",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare owner follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Chicago",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

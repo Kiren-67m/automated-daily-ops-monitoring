@@ -6,14 +6,14 @@ import hmac
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from threading import Event, Thread
 from time import monotonic
 
 from filelock import Timeout
 from flask import Flask, jsonify, request
 
-from detect_anomalies import DataNotReady, DeliveryError, parse_args, run_once
+from detect_anomalies import DataNotReady, DeliveryError, load_state, parse_args, run_once
 
 LOG = logging.getLogger("daily_ops")
 
@@ -27,14 +27,56 @@ def create_app(args=None, token=None):
     def health():
         return jsonify(ok=True, mode=args.mode)
 
-    @app.post("/run")
-    def run():
+    def authorization_error():
         if not token or token == "change-me":
             return jsonify(error="OPS_AGENT_TOKEN is not configured"), 503
         if not hmac.compare_digest(request.headers.get("X-OPS-TOKEN", "").encode(), token.encode()):
             return jsonify(error="unauthorized"), 401
+        return None
+
+    @app.get("/reports")
+    def reports():
+        error = authorization_error()
+        if error is not None:
+            return error
+        if args.mode != "live":
+            return jsonify(reports=[])
         try:
-            payload = run_once(args)
+            history = load_state(args.state_file, {"completed": []}).get("reports", {})
+        except (OSError, ValueError) as exc:
+            return jsonify(error=str(exc)), 422
+        day = request.args.get("date")
+        if day is not None:
+            report = history.get(day)
+            if report is None:
+                return jsonify(error="report not found"), 404
+            return jsonify(report=report)
+        return jsonify(reports=[
+            {"date": day, "status": item["payload"]["status"], "delivery": item["delivery"],
+             "attempts": len(item["attempts"])}
+            for day, item in sorted(history.items(), reverse=True)
+        ])
+
+    @app.post("/run")
+    def run():
+        error = authorization_error()
+        if error is not None:
+            return error
+        target = None
+        if request.is_json:
+            body = request.get_json(silent=True)
+            if not isinstance(body, dict):
+                return jsonify(error="expected a JSON object"), 400
+            if body.get("date") is not None:
+                value = body["date"]
+                try:
+                    target = date.fromisoformat(value)
+                    if args.mode != "live" or target.isoformat() != value:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    return jsonify(error="date must be YYYY-MM-DD in live mode"), 400
+        try:
+            payload = run_once(args, target_date=target)
         except (DataNotReady, FileNotFoundError, Timeout) as exc:
             return jsonify(error=str(exc)), 409
         except DeliveryError as exc:

@@ -1,0 +1,366 @@
+{
+  "id": "AutoRegistryN8nDemo",
+  "name": "Auto · Incident registry",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4f5aa872-5d9a-5a33-8992-c93e59a826e0",
+      "name": "Registry input"
+    },
+    {
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "auto_ops_incidents",
+        "columns": {
+          "column": [
+            {
+              "name": "event_id",
+              "type": "string"
+            },
+            {
+              "name": "business_date",
+              "type": "string"
+            },
+            {
+              "name": "severity",
+              "type": "string"
+            },
+            {
+              "name": "summary",
+              "type": "string"
+            },
+            {
+              "name": "signals_json",
+              "type": "string"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "acknowledged_by",
+              "type": "string"
+            },
+            {
+              "name": "acknowledged_at",
+              "type": "string"
+            },
+            {
+              "name": "resolved_by",
+              "type": "string"
+            },
+            {
+              "name": "resolved_at",
+              "type": "string"
+            },
+            {
+              "name": "resolution_note",
+              "type": "string"
+            },
+            {
+              "name": "signal_count",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "id": "16867e27-60ec-54f4-9edc-718542455f79",
+      "name": "Ensure incident table"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "45b3af07-e858-580e-bae7-6bbb0811d0e6",
+              "leftValue": "={{ Boolean($('Registry input').first().json.event_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        510,
+        0
+      ],
+      "id": "630c433d-72f5-504a-ba2a-808e670504c0",
+      "name": "Has an alert?"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "auto_ops_incidents"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "event_id",
+              "keyValue": "={{ $('Registry input').first().json.event_id }}",
+              "condition": "eq"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $('Registry input').first().json.event_id }}",
+            "business_date": "={{ $('Registry input').first().json.date }}",
+            "severity": "={{ $('Registry input').first().json.signals.some(signal => signal.severity === 'high') ? 'high' : 'medium' }}",
+            "summary": "={{ $('Registry input').first().json.summary }}",
+            "signals_json": "={{ JSON.stringify($('Registry input').first().json.signals) }}",
+            "signal_count": "={{ $('Registry input').first().json.signal_count }}"
+          },
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "business_date",
+              "displayName": "business_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "signals_json",
+              "displayName": "signals_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "acknowledged_by",
+              "displayName": "acknowledged_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "acknowledged_at",
+              "displayName": "acknowledged_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resolved_by",
+              "displayName": "resolved_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resolved_at",
+              "displayName": "resolved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resolution_note",
+              "displayName": "resolution_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "signal_count",
+              "displayName": "signal_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        760,
+        -95
+      ],
+      "id": "748a1568-6965-568f-8b97-745061f20038",
+      "name": "Upsert incident by event ID"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('Registry input').first().json, incident_id: $json.id, incident_status: $json.status || 'open' }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1010,
+        -95
+      ],
+      "id": "99fdd60a-dd94-530c-9e1e-a4d6d03e8c9b",
+      "name": "Incident receipt"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"ready\": true}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        760,
+        110
+      ],
+      "id": "19e6578b-b07d-5f32-ad5e-93112f03f991",
+      "name": "Storage ready"
+    }
+  ],
+  "connections": {
+    "Registry input": {
+      "main": [
+        [
+          {
+            "node": "Ensure incident table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure incident table": {
+      "main": [
+        [
+          {
+            "node": "Has an alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has an alert?": {
+      "main": [
+        [
+          {
+            "node": "Upsert incident by event ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Storage ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert incident by event ID": {
+      "main": [
+        [
+          {
+            "node": "Incident receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Chicago",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

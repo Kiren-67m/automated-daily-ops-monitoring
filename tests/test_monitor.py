@@ -61,7 +61,12 @@ class MonitorTests(unittest.TestCase):
                                                                   SimpleNamespace(status_code=204)]) as post:
             with self.assertRaises(DeliveryError):
                 run_once(args)
-            self.assertFalse(self.state.exists())
+            pending = json.loads(self.state.read_text())
+            self.assertEqual(pending["completed"], [])
+            saved = pending["reports"][self.day.isoformat()]
+            self.assertEqual(saved["delivery"], "retry_pending")
+            self.assertEqual(saved["attempts"][0]["http_status"], 500)
+            self.input.unlink()
             result = run_once(args)
             self.assertEqual(result["date"], self.day.isoformat())
             self.assertEqual(result["status"], "anomaly_detected")
@@ -71,7 +76,12 @@ class MonitorTests(unittest.TestCase):
             self.assertEqual(post.call_count, 2)
             self.assertEqual({call.kwargs["headers"]["Idempotency-Key"] for call in post.call_args_list},
                              {result["event_id"]})
-            self.assertEqual(json.loads(self.state.read_text()), {"completed": [self.day.isoformat()]})
+            self.assertEqual(result, saved["payload"])
+            state = json.loads(self.state.read_text())
+            self.assertEqual(state["completed"], [self.day.isoformat()])
+            self.assertEqual(state["reports"][self.day.isoformat()]["delivery"], "delivered")
+            self.assertEqual([item["http_status"] for item in state["reports"][self.day.isoformat()]["attempts"]],
+                             [500, 204])
 
     def test_missing_and_duplicate_days_do_not_mark_completion(self):
         removed = self.rows.pop(1)
@@ -96,6 +106,7 @@ class MonitorTests(unittest.TestCase):
         client = create_app(self.live_args(), "test-token").test_client()
         self.assertTrue(client.get("/health").json["ok"])
         self.assertEqual(client.post("/run").status_code, 401)
+        self.assertEqual(client.get("/reports").status_code, 401)
         headers = {"X-OPS-TOKEN": "test-token"}
         self.state.parent.mkdir()
         with FileLock(f"{self.state}.lock"):
@@ -104,6 +115,30 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["result"]["status"], "anomaly_detected")
         self.assertEqual(client.post("/run", headers=headers).json["result"]["status"], "already_processed")
+        restarted = create_app(self.live_args(), "test-token").test_client()
+        history = restarted.get("/reports", headers=headers).json["reports"]
+        self.assertEqual(history, [{"date": self.day.isoformat(), "status": "anomaly_detected",
+                                    "delivery": "not_configured", "attempts": 0}])
+        saved = restarted.get(f"/reports?date={self.day}", headers=headers).json["report"]
+        self.assertEqual(saved["payload"], response.json["result"])
+
+    def test_service_accepts_an_explicit_business_date(self):
+        args = self.live_args()
+        args.date = None
+        client = create_app(args, "test-token").test_client()
+        headers = {"X-OPS-TOKEN": "test-token"}
+        invalid = client.post("/run", json={"date": "20250309"}, headers=headers)
+        self.assertEqual(invalid.status_code, 400)
+        self.assertFalse(self.state.exists())
+        response = client.post("/run", json={"date": self.day.isoformat()}, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["result"]["date"], self.day.isoformat())
+
+    def test_legacy_completed_day_still_skips_processing(self):
+        self.state.parent.mkdir()
+        self.state.write_text(json.dumps({"completed": [self.day.isoformat()]}))
+        self.input.unlink()
+        self.assertEqual(run_once(self.live_args())["status"], "already_processed")
 
     def test_scheduler_retries_after_delay_and_only_completes_yesterday_once(self):
         args = self.live_args()

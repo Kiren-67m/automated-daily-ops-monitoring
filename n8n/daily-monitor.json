@@ -1,0 +1,471 @@
+{
+  "id": "AutoDailyN8nDemo",
+  "name": "Auto · Daily monitoring",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -144
+      ],
+      "id": "50a5c9ec-009b-5c00-83e6-f8ede73a35c2",
+      "name": "Daily at 08:00"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "144fe642-9bf7-5460-adcf-caaa98719c98",
+      "name": "Run manually"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "auto-monitor/run",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        144
+      ],
+      "id": "1f019e04-0d84-5c2f-a091-69359de49638",
+      "name": "Run or backfill",
+      "webhookId": "53a640d2-6883-575b-b411-fd9a4104bfc5",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AutoOperatorToken",
+          "name": "Auto Operator Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5001/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ date: $json.body?.date ?? null }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "c89f82d7-7771-52ca-8862-7d5bc8acc060",
+      "name": "Run Auto monitor",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AutoServiceToken",
+          "name": "Auto Service Token"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify($json.result) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        128
+      ],
+      "id": "0179824d-81e7-5368-989f-d32f76ed1481",
+      "name": "Daily report"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8036dc76-dabd-53a4-8ad5-ca8544e74d38",
+              "leftValue": "={{ $json.result.mode === 'live' && $json.result.status === 'anomaly_detected' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        512,
+        0
+      ],
+      "id": "d91a743c-c4a5-5f46-8afe-72204dfb3d73",
+      "name": "Live anomaly detected?"
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5001/reports",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "date",
+              "value": "={{ $json.result.date }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        -160
+      ],
+      "id": "54436254-64b0-54c0-b18a-20fb2e84285c",
+      "name": "Read alert delivery receipt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AutoServiceToken",
+          "name": "Auto Service Token"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c636e9ea-c24b-5bde-b2d1-ae59ab4a0d50",
+              "leftValue": "={{ $json.report.delivery === 'delivered' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        -160
+      ],
+      "id": "0af609ef-2db7-5b2d-a23b-3eb86f899117",
+      "name": "Alert delivered?"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$json.report.payload, alert_delivery: $json.report.delivery }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        -256
+      ],
+      "id": "ec5cb5e8-be18-5598-ae7b-040bc6df4f2c",
+      "name": "Confirmed incident alert"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('Run Auto monitor').first().json.result, alert_delivery: $json.report?.delivery ?? 'verification_unavailable' }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        -64
+      ],
+      "id": "54f4000c-0ca5-534e-a5e3-6000d9f21210",
+      "name": "Unconfirmed incident alert"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5514a6cd-a38a-5f04-abe8-e16a9cfd7982",
+              "leftValue": "={{ $json.result.status === 'already_processed' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        144
+      ],
+      "id": "b3260ebb-d971-5a95-a21e-4ec0179f6c15",
+      "name": "Date already processed?"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify($json.result) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        320
+      ],
+      "id": "15fca18e-dd59-560b-b8d2-fa1d19c775f0",
+      "name": "Skip duplicate run"
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ typeof $json.error === 'string' ? $json.error : $json.error?.message ?? 'Auto service request failed' }}"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        768,
+        416
+      ],
+      "id": "d585ca6a-6b7d-5f47-a9f0-dc78b6b926d5",
+      "name": "Monitoring failed"
+    },
+    {
+      "parameters": {
+        "content": "## 01 · Run monitoring\nSchedule, manual run, or backfill.",
+        "width": 442,
+        "height": 496,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -240
+      ],
+      "id": "7d23fe7e-8d69-5c95-b156-218bfb203cb0",
+      "name": "Monitoring entry"
+    },
+    {
+      "parameters": {
+        "content": "## 02 · Route the outcome\nVerify alert delivery, publish the daily report, or skip a duplicate.",
+        "width": 954,
+        "height": 868,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        420,
+        -340
+      ],
+      "id": "1149aa05-a4f3-53c6-8d29-67ff28e2fbbd",
+      "name": "Monitoring decision"
+    }
+  ],
+  "connections": {
+    "Daily at 08:00": {
+      "main": [
+        [
+          {
+            "node": "Run Auto monitor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Run Auto monitor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run or backfill": {
+      "main": [
+        [
+          {
+            "node": "Run Auto monitor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Auto monitor": {
+      "main": [
+        [
+          {
+            "node": "Live anomaly detected?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Monitoring failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live anomaly detected?": {
+      "main": [
+        [
+          {
+            "node": "Read alert delivery receipt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Date already processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read alert delivery receipt": {
+      "main": [
+        [
+          {
+            "node": "Alert delivered?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unconfirmed incident alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert delivered?": {
+      "main": [
+        [
+          {
+            "node": "Confirmed incident alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unconfirmed incident alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date already processed?": {
+      "main": [
+        [
+          {
+            "node": "Skip duplicate run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Daily report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Chicago",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

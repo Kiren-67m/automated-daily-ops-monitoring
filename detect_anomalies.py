@@ -40,6 +40,10 @@ class DataNotReady(ValueError):
 class DeliveryError(RuntimeError):
     """The configured receiver did not acknowledge delivery."""
 
+    def __init__(self, message, http_status=None):
+        super().__init__(message)
+        self.http_status = http_status
+
 
 def parse_args(argv=None):
     load_dotenv(BASE_DIR / ".env")
@@ -152,6 +156,11 @@ def build_payload(row, baseline, day, args, cursor=None):
     else:
         payload["event_id"] = f"daily-ops:{day}"
         payload["timezone"] = args.business_timezone.key
+        payload["baseline_days"] = args.rolling_days
+        payload["metrics"] = {
+            metric: {"actual": float(row[metric]), "baseline": float(baseline[metric])}
+            for metric in METRICS
+        }
     return payload
 
 
@@ -167,8 +176,11 @@ def load_state(path, default):
         raise ValueError(f"Run state has invalid {key} data. Check that the mode uses its own state file.")
     if key == "cursor" and state[key] < 0:
         raise ValueError("The demo cursor cannot be negative.")
-    if key == "completed" and not all(isinstance(day, str) for day in state[key]):
-        raise ValueError("Live state must contain completed dates.")
+    if key == "completed":
+        if not all(isinstance(day, str) for day in state[key]):
+            raise ValueError("Live state must contain completed dates.")
+        if not isinstance(state.get("reports", {}), dict):
+            raise ValueError("Live state must contain a valid report history.")
     return state
 
 
@@ -200,31 +212,40 @@ def deliver(payload, args):
     except requests.RequestException as exc:
         raise DeliveryError(f"Webhook request failed ({type(exc).__name__}).") from None
     if not 200 <= response.status_code < 300:
-        raise DeliveryError(f"Webhook returned HTTP {response.status_code}.")
+        raise DeliveryError(f"Webhook returned HTTP {response.status_code}.", response.status_code)
+    return response.status_code
 
 
-def run_with_state(args, target_date):
-    if args.mode == "demo":
-        state = load_state(args.state_file, {"cursor": 0})
-        frame = read_metrics(args.input)
-        baseline = frame.rolling(args.rolling_days).mean().shift(1)
-        candidates = baseline.dropna().loc[str(args.sim_start_date):]
-        if candidates.empty:
-            raise DataNotReady("The demo has no rows with a complete baseline after the start date.")
-        cursor = state["cursor"] % len(candidates)
-        day = candidates.index[cursor]
-        payload = build_payload(frame.loc[day], candidates.loc[day], day.date().isoformat(), args, cursor)
-        next_state = {"cursor": cursor + 1}
-    else:
-        today = datetime.now(args.business_timezone).date()
-        day = target_date or args.date or (today - timedelta(days=1))
-        if day >= today:
-            raise ValueError("Live mode only checks dates completed in the configured business time zone.")
-        date_text = day.isoformat()
-        state = {"completed": []} if args.dry_run else load_state(args.state_file, {"completed": []})
-        if date_text in state["completed"]:
-            return {"mode": "live", "date": date_text, "status": "already_processed",
-                    "event_id": f"daily-ops:{date_text}", "signals_count": 0, "signals": []}
+def run_demo(args):
+    state = load_state(args.state_file, {"cursor": 0})
+    frame = read_metrics(args.input)
+    baseline = frame.rolling(args.rolling_days).mean().shift(1)
+    candidates = baseline.dropna().loc[str(args.sim_start_date):]
+    if candidates.empty:
+        raise DataNotReady("The demo has no rows with a complete baseline after the start date.")
+    cursor = state["cursor"] % len(candidates)
+    day = candidates.index[cursor]
+    payload = build_payload(frame.loc[day], candidates.loc[day], day.date().isoformat(), args, cursor)
+    deliver(payload, args)
+    if not args.dry_run:
+        save_state(args.state_file, {"cursor": cursor + 1})
+    return payload
+
+
+def run_live(args, target_date):
+    today = datetime.now(args.business_timezone).date()
+    day = target_date or args.date or (today - timedelta(days=1))
+    if day >= today:
+        raise ValueError("Live mode only checks dates completed in the configured business time zone.")
+    date_text = day.isoformat()
+    state = {"completed": []} if args.dry_run else load_state(args.state_file, {"completed": []})
+    if date_text in state["completed"]:
+        return {"mode": "live", "date": date_text, "status": "already_processed",
+                "event_id": f"daily-ops:{date_text}", "signals_count": 0, "signals": []}
+
+    reports = state.setdefault("reports", {})
+    report = reports.get(date_text)
+    if report is None:
         frame = read_metrics(args.input)
         window = pd.date_range(end=day, periods=args.rolling_days + 1, freq="D")
         missing = window.difference(frame.index)
@@ -233,20 +254,43 @@ def run_with_state(args, target_date):
             raise DataNotReady(f"KPI CSV is missing required dates: {dates}.")
         rows = frame.loc[window]
         payload = build_payload(rows.iloc[-1], rows.iloc[:-1].mean(), date_text, args)
-        next_state = {"completed": sorted([*state["completed"], date_text])}
+        report = {"payload": payload, "delivery": "not_needed", "attempts": []}
+    else:
+        payload = report["payload"]
+        if not args.webhook_url:
+            raise DeliveryError("Restore the webhook URL to retry the pending report.")
 
-    deliver(payload, args)
-    if not args.dry_run:
-        save_state(args.state_file, next_state)
+    if args.dry_run:
+        return payload
+
+    if payload["signals"] and not args.webhook_url:
+        report["delivery"] = "not_configured"
+    if payload["signals"] and args.webhook_url:
+        attempted_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        try:
+            http_status = deliver(payload, args)
+        except DeliveryError as exc:
+            report["delivery"] = "retry_pending"
+            report["attempts"].append({"time": attempted_at, "status": "failed",
+                                       "http_status": exc.http_status, "error": str(exc)})
+            reports[date_text] = report
+            save_state(args.state_file, state)
+            raise
+        report["delivery"] = "delivered"
+        report["attempts"].append({"time": attempted_at, "status": "delivered", "http_status": http_status})
+
+    reports[date_text] = report
+    state["completed"] = sorted([*state["completed"], date_text])
+    save_state(args.state_file, state)
     return payload
 
 
 def run_once(args, target_date=None):
     if args.dry_run:
-        return run_with_state(args, target_date)
+        return run_demo(args) if args.mode == "demo" else run_live(args, target_date)
     args.state_file.parent.mkdir(parents=True, exist_ok=True)
     with FileLock(f"{args.state_file}.lock", timeout=0):
-        return run_with_state(args, target_date)
+        return run_demo(args) if args.mode == "demo" else run_live(args, target_date)
 
 
 def main():

@@ -1,35 +1,75 @@
 # Automated Daily Operations Monitoring
 
-A Python monitor for daily orders, revenue, cancellations and average order value. Feed it one row per completed business day. It compares that day with the preceding seven calendar days and explains any alert. An optional daily schedule and webhook let a small team run it from an existing computer or server.
+![Daily monitoring in the n8n editor, branching into confirmed and unconfirmed alerts, a daily report, duplicate handling and monitoring failure](docs/n8n-demo/daily-monitor-canvas.jpg)
 
-## See the daily report and alert
+A Python monitor and six n8n workflows for daily KPIs, alert intake, incident tracking and shift handoff. The monitor compares orders, revenue, cancellations and average order value against the preceding seven calendar days.
 
-![Auto demo showing a normal daily report on the left and an exception alert with four high-severity signals on the right](docs/demo/report-and-alert.png)
+## A real n8n demo run
 
-This run used **42 days and 1,872 synthetic orders**. On November 6 the monitor recorded a normal report with 44 orders and $2,103.57 in captured revenue. On November 7, revenue fell 78% against the prior seven-day mean and cancellations rose from a mean of 2 to 8. The scheduled check delivered one webhook with four signals. A repeated trigger returned `already_processed`.
+The run used **42 days and 1,872 synthetic orders**. Both dates below went through the same n8n run webhook.
 
-[Normal report text](docs/demo/normal-report.txt) · [Received webhook JSON](docs/demo/webhook-alert.json)
+### Normal daily report
 
-## Run the full demo with one command
-
-From a clone or downloaded copy of this repository, install the dependencies once with Python 3.12.
-
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+```text
+Date: 2026-11-06 | Status: normal
+Orders: 44 (avg 44.3) | Revenue: 2103.57 (avg 1935.05)
+Canceled: 1 (avg 2.3) | AOV: 47.81 (avg 43.57)
+Signals:
+- none
 ```
 
-Then run the full demo.
+### Alert, acknowledgement and resolution
+
+On November 7, revenue fell **78%** to **$446.76** against the seven-day average of **$2,032.50**. Orders fell **51%**, average order value fell **55%** and cancellations rose from **2** to **8**. n8n received one alert with four high-severity signals and registered event `daily-ops:2026-11-07`.
+
+| Step | Result in n8n | Shift handoff |
+| --- | --- | --- |
+| Alert delivered | HTTP 200. One incident opened. | **Escalate** the unclaimed high-severity incident. |
+| Acknowledged | `Demo Operator` took ownership. | **Follow up** with the assigned operator. |
+| Resolved | `Demo Lead` closed it with the note “Synthetic example. Restored checkout and verified a test order.” | **All clear**. The active queue returned zero incidents. |
+
+Running the same date again returned `already_processed`. Replaying the alert after closure kept the existing incident closed. An attempt to resolve before acknowledgement returned HTTP 409.
+
+<details>
+<summary>See the three handoff paths in the n8n editor</summary>
+
+![Shift handoff in n8n with branches for escalation, owner follow-up and all clear](docs/n8n-demo/shift-handoff-canvas.jpg)
+
+</details>
+
+[Actual run output (JSON)](docs/n8n-demo/sample-run.json) · [Six workflows and deployment setup](n8n/README.md)
+
+## Reproduce the n8n demo
+
+Use Python 3.12 and Node.js 22 LTS. The example was run with n8n 2.23.2. [n8n npm installation guide](https://docs.n8n.io/hosting/installation/npm/)
+
+```bash
+git clone https://github.com/Kiren-67m/automated-daily-ops-monitoring.git
+cd automated-daily-ops-monitoring
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+npm install -g n8n@2.23.2
+.venv/bin/python scripts/run_n8n_demo.py --keep-open
+```
+
+The last command generates the orders, builds the daily KPIs, starts Auto and a fresh n8n instance on loopback, imports all six workflows, and runs the normal day and full incident lifecycle. It creates the demo tokens for you. The dates are relative to the day you run it.
+
+1. Open the printed **Workflow UI** URL and complete n8n’s local owner setup.
+2. Open **Auto · Daily monitoring → Executions**. Select the first successful run and open **Daily report**. The anomaly run ends at **Confirmed incident alert**.
+3. Open **Auto · Incident actions → Executions** to inspect the acknowledgement and resolution. Open **Auto · Shift handoff → Executions** to compare the escalation, follow-up and all-clear branches.
+4. Find reports, receipts and handoffs in `data/n8n-demo/run-*/n8n-results.json`. Press Ctrl+C when you finish exploring. Omit `--keep-open` for an automated run that exits after verification.
+
+On Windows, create the environment with `py -3.12 -m venv .venv` and use `.venv\Scripts\python.exe` in place of `.venv/bin/python`.
+
+### Run the Python-only demo
 
 ```bash
 .venv/bin/python scripts/run_demo.py
 ```
 
-On Windows, create the environment with `py -3.12 -m venv .venv` and use `.venv\Scripts\python.exe` in place of `.venv/bin/python`.
+This demo runs the scheduled Python service against a local test receiver. The receiver returns HTTP 503 on its first attempt. The service retries the saved event and verifies that the receiver accepts it once.
 
-The command generates 42 days of orders, line items and payments, runs the KPI builder, checks a normal day, and starts the real scheduled service against a temporary local webhook receiver. It checks that the receiver accepted one alert and that a repeat request stays deduplicated. It closes the service when the demonstration finishes. The scenario is dated relative to the run, so the calendar dates and order totals can differ from the screenshot.
-
-Open `demo-preview.html` in the printed `data/demo/run-*/` directory. That directory also contains the synthetic CSVs, daily KPI workbook, normal report text, received alert JSON and service log. The demo creates its own temporary token and run state and uses loopback connections.
+Open `demo-preview.html` in the printed `data/demo/run-*/` directory. That directory also contains the synthetic CSVs, daily KPI workbook, normal report text, received alert JSON, report history, and service log. The demo creates its own temporary token and run state and uses loopback connections.
 
 ## Connect your own daily export
 
@@ -80,7 +120,9 @@ Set `OPS_WEBHOOK_URL` to the receiving URL, such as an active n8n production web
 
 The service listens on `127.0.0.1:5001` by default. Use `GET /health` to check that it is running. To trigger a run from n8n or a script on the same machine, call `POST /run` with the `X-OPS-TOKEN` header. The response includes the JSON result. A webhook delivery failure returns HTTP 502 and leaves that date eligible for retry. Use one scheduler for each export. If n8n schedules the runs, leave `OPS_RUN_AT` blank.
 
-Live completion dates are stored in `var/live_state.json` by default. Keep that file on local disk and use the same state file for every process monitoring this export. The monitor records a date after a successful check, including a successful webhook response if an alert was sent. Repeated runs for that date return `already_processed`. A receiver that accepts an alert but loses the response can see the same alert again, so use the stable `Idempotency-Key` header to deduplicate at the receiver.
+Use the same token with `GET /reports` to list saved days and delivery status. Add `?date=YYYY-MM-DD` to retrieve one report with its metrics, baseline and delivery attempts. The history records normal days, alerts and pending retries. A retry uses the saved payload and event ID. Previously completed dates from older state files remain deduplicated and appear in report history only if a report was saved.
+
+Live reports and completion dates are stored in `var/live_state.json` by default. Keep that file on local disk and use the same state file for every process monitoring this export. The monitor records a date after a successful check, including a successful webhook response if an alert was sent. Repeated runs for that date return `already_processed`. A receiver that accepts an alert but loses the response can see the same alert again, so use the stable `Idempotency-Key` header to deduplicate at the receiver.
 
 ## Rebuild the original Olist demo
 

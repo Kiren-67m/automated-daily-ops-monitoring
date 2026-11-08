@@ -1,0 +1,324 @@
+{
+  "reports": [
+    {
+      "baseline_days": 7,
+      "date": "2026-11-06",
+      "event_id": "daily-ops:2026-11-06",
+      "metrics": {
+        "avg_order_value": {
+          "actual": 47.81,
+          "baseline": 43.57285714285714
+        },
+        "canceled_orders": {
+          "actual": 1,
+          "baseline": 2.2857142857142856
+        },
+        "orders_count": {
+          "actual": 44,
+          "baseline": 44.285714285714285
+        },
+        "revenue": {
+          "actual": 2103.57,
+          "baseline": 1935.0514285714285
+        }
+      },
+      "mode": "live",
+      "run_time": "2026-11-08T18:13:24+00:00",
+      "signals": [],
+      "signals_count": 0,
+      "status": "normal",
+      "summary": "Date: 2026-11-06 | Status: normal\nOrders: 44 (avg 44.3) | Revenue: 2103.57 (avg 1935.05)\nCanceled: 1 (avg 2.3) | AOV: 47.81 (avg 43.57)\nSignals:\n- none",
+      "timezone": "America/Chicago"
+    },
+    {
+      "baseline_days": 7,
+      "date": "2026-11-07",
+      "event_id": "daily-ops:2026-11-07",
+      "metrics": {
+        "avg_order_value": {
+          "actual": 20.31,
+          "baseline": 44.91428571428571
+        },
+        "canceled_orders": {
+          "actual": 8,
+          "baseline": 2
+        },
+        "orders_count": {
+          "actual": 22,
+          "baseline": 45.285714285714285
+        },
+        "revenue": {
+          "actual": 446.75999999999993,
+          "baseline": 2032.495714285714
+        }
+      },
+      "mode": "live",
+      "run_time": "2026-11-08T18:13:24+00:00",
+      "signals": [
+        {
+          "details": "Revenue -78% vs 7-day avg",
+          "direction": "down",
+          "metric": "revenue",
+          "severity": "high"
+        },
+        {
+          "details": "Orders -51% vs 7-day avg",
+          "direction": "down",
+          "metric": "orders_count",
+          "severity": "high"
+        },
+        {
+          "details": "AOV -55% vs 7-day avg",
+          "direction": "down",
+          "metric": "avg_order_value",
+          "severity": "high"
+        },
+        {
+          "details": "Cancellations +300% vs 7-day avg",
+          "direction": "up",
+          "metric": "canceled_orders",
+          "severity": "high"
+        }
+      ],
+      "signals_count": 4,
+      "status": "anomaly_detected",
+      "summary": "Date: 2026-11-07 | Status: anomaly_detected\nOrders: 22 (avg 45.3) | Revenue: 446.76 (avg 2032.50)\nCanceled: 8 (avg 2.0) | AOV: 20.31 (avg 44.91)\nSignals:\n- revenue (down, high): Revenue -78% vs 7-day avg\n- orders_count (down, high): Orders -51% vs 7-day avg\n- avg_order_value (down, high): AOV -55% vs 7-day avg\n- canceled_orders (up, high): Cancellations +300% vs 7-day avg",
+      "timezone": "America/Chicago",
+      "alert_delivery": "delivered"
+    },
+    {
+      "date": "2026-11-07",
+      "event_id": "daily-ops:2026-11-07",
+      "mode": "live",
+      "signals": [],
+      "signals_count": 0,
+      "status": "already_processed"
+    }
+  ],
+  "history": [
+    {
+      "attempts": 1,
+      "date": "2026-11-07",
+      "delivery": "delivered",
+      "status": "anomaly_detected"
+    },
+    {
+      "attempts": 0,
+      "date": "2026-11-06",
+      "delivery": "not_needed",
+      "status": "normal"
+    }
+  ],
+  "alert_receipt": {
+    "attempts": [
+      {
+        "http_status": 200,
+        "status": "delivered",
+        "time": "2026-11-08T18:13:24+00:00"
+      }
+    ],
+    "delivery": "delivered",
+    "payload": {
+      "baseline_days": 7,
+      "date": "2026-11-07",
+      "event_id": "daily-ops:2026-11-07",
+      "metrics": {
+        "avg_order_value": {
+          "actual": 20.31,
+          "baseline": 44.91428571428571
+        },
+        "canceled_orders": {
+          "actual": 8.0,
+          "baseline": 2.0
+        },
+        "orders_count": {
+          "actual": 22.0,
+          "baseline": 45.285714285714285
+        },
+        "revenue": {
+          "actual": 446.75999999999993,
+          "baseline": 2032.495714285714
+        }
+      },
+      "mode": "live",
+      "run_time": "2026-11-08T18:13:24+00:00",
+      "signals": [
+        {
+          "details": "Revenue -78% vs 7-day avg",
+          "direction": "down",
+          "metric": "revenue",
+          "severity": "high"
+        },
+        {
+          "details": "Orders -51% vs 7-day avg",
+          "direction": "down",
+          "metric": "orders_count",
+          "severity": "high"
+        },
+        {
+          "details": "AOV -55% vs 7-day avg",
+          "direction": "down",
+          "metric": "avg_order_value",
+          "severity": "high"
+        },
+        {
+          "details": "Cancellations +300% vs 7-day avg",
+          "direction": "up",
+          "metric": "canceled_orders",
+          "severity": "high"
+        }
+      ],
+      "signals_count": 4,
+      "status": "anomaly_detected",
+      "summary": "Date: 2026-11-07 | Status: anomaly_detected\nOrders: 22 (avg 45.3) | Revenue: 446.76 (avg 2032.50)\nCanceled: 8 (avg 2.0) | AOV: 20.31 (avg 44.91)\nSignals:\n- revenue (down, high): Revenue -78% vs 7-day avg\n- orders_count (down, high): Orders -51% vs 7-day avg\n- avg_order_value (down, high): AOV -55% vs 7-day avg\n- canceled_orders (up, high): Cancellations +300% vs 7-day avg",
+      "timezone": "America/Chicago"
+    }
+  },
+  "incident": {
+    "event_id": "daily-ops:2026-11-07",
+    "business_date": "2026-11-07",
+    "severity": "high",
+    "summary": "Date: 2026-11-07 | Status: anomaly_detected\nOrders: 22 (avg 45.3) | Revenue: 446.76 (avg 2032.50)\nCanceled: 8 (avg 2.0) | AOV: 20.31 (avg 44.91)\nSignals:\n- revenue (down, high): Revenue -78% vs 7-day avg\n- orders_count (down, high): Orders -51% vs 7-day avg\n- avg_order_value (down, high): AOV -55% vs 7-day avg\n- canceled_orders (up, high): Cancellations +300% vs 7-day avg",
+    "signals_json": "[{\"metric\":\"revenue\",\"direction\":\"down\",\"severity\":\"high\",\"details\":\"Revenue -78% vs 7-day avg\"},{\"metric\":\"orders_count\",\"direction\":\"down\",\"severity\":\"high\",\"details\":\"Orders -51% vs 7-day avg\"},{\"metric\":\"avg_order_value\",\"direction\":\"down\",\"severity\":\"high\",\"details\":\"AOV -55% vs 7-day avg\"},{\"metric\":\"canceled_orders\",\"direction\":\"up\",\"severity\":\"high\",\"details\":\"Cancellations +300% vs 7-day avg\"}]",
+    "status": "resolved",
+    "acknowledged_by": "Demo Operator",
+    "acknowledged_at": "2026-11-08T18:13:24.528Z",
+    "resolved_by": "Demo Lead",
+    "resolved_at": "2026-11-08T18:13:24.569Z",
+    "resolution_note": "Synthetic example. Restored checkout and verified a test order.",
+    "signal_count": 4,
+    "id": 1,
+    "createdAt": "2026-11-08T18:13:24.413Z",
+    "updatedAt": "2026-11-08T18:13:24.577Z"
+  },
+  "replay_receipt": {
+    "event_id": "daily-ops:2026-11-07",
+    "date": "2026-11-07",
+    "status": "anomaly_detected",
+    "signal_count": 4,
+    "signals": [
+      {
+        "details": "Revenue -78% vs 7-day avg",
+        "direction": "down",
+        "metric": "revenue",
+        "severity": "high"
+      },
+      {
+        "details": "Orders -51% vs 7-day avg",
+        "direction": "down",
+        "metric": "orders_count",
+        "severity": "high"
+      },
+      {
+        "details": "AOV -55% vs 7-day avg",
+        "direction": "down",
+        "metric": "avg_order_value",
+        "severity": "high"
+      },
+      {
+        "details": "Cancellations +300% vs 7-day avg",
+        "direction": "up",
+        "metric": "canceled_orders",
+        "severity": "high"
+      }
+    ],
+    "summary": "Date: 2026-11-07 | Status: anomaly_detected\nOrders: 22 (avg 45.3) | Revenue: 446.76 (avg 2032.50)\nCanceled: 8 (avg 2.0) | AOV: 20.31 (avg 44.91)\nSignals:\n- revenue (down, high): Revenue -78% vs 7-day avg\n- orders_count (down, high): Orders -51% vs 7-day avg\n- avg_order_value (down, high): AOV -55% vs 7-day avg\n- canceled_orders (up, high): Cancellations +300% vs 7-day avg",
+    "incident_id": 1,
+    "incident_status": "resolved"
+  },
+  "queues": {
+    "before_alert": {
+      "active_count": 0,
+      "incidents": []
+    },
+    "open": {
+      "active_count": 1,
+      "incidents": [
+        {
+          "incident_id": 1,
+          "event_id": "daily-ops:2026-11-07",
+          "date": "2026-11-07",
+          "status": "open",
+          "severity": "high",
+          "created_at": "2026-11-08T18:13:24.413Z",
+          "acknowledged_by": null,
+          "signal_count": 4
+        }
+      ]
+    },
+    "after_closure": {
+      "active_count": 0,
+      "incidents": []
+    }
+  },
+  "handoffs": {
+    "open": {
+      "generated_at": "2026-11-08T18:13:24.480Z",
+      "active_count": 1,
+      "open_count": 1,
+      "acknowledged_count": 0,
+      "high_priority_count": 1,
+      "older_than_24h_count": 0,
+      "priority_queue": [
+        {
+          "incident_id": 1,
+          "event_id": "daily-ops:2026-11-07",
+          "date": "2026-11-07",
+          "status": "open",
+          "severity": "high",
+          "created_at": "2026-11-08T18:13:24.413Z",
+          "acknowledged_by": null,
+          "signal_count": 4,
+          "age_hours": 0,
+          "next_action": "Assign an operator"
+        }
+      ],
+      "escalation_event_ids": [
+        "daily-ops:2026-11-07"
+      ],
+      "handoff_status": "escalate",
+      "summary": "Escalate 1 unclaimed high-severity or overdue incident(s): daily-ops:2026-11-07"
+    },
+    "acknowledged": {
+      "generated_at": "2026-11-08T18:13:24.560Z",
+      "active_count": 1,
+      "open_count": 0,
+      "acknowledged_count": 1,
+      "high_priority_count": 1,
+      "older_than_24h_count": 0,
+      "priority_queue": [
+        {
+          "incident_id": 1,
+          "event_id": "daily-ops:2026-11-07",
+          "date": "2026-11-07",
+          "status": "acknowledged",
+          "severity": "high",
+          "created_at": "2026-11-08T18:13:24.413Z",
+          "acknowledged_by": "Demo Operator",
+          "signal_count": 4,
+          "age_hours": 0,
+          "next_action": "Follow up with the assigned operator"
+        }
+      ],
+      "escalation_event_ids": [],
+      "handoff_status": "follow_up",
+      "summary": "Follow up on 1 active incident(s). 1 acknowledged, 0 awaiting assignment."
+    },
+    "closed": {
+      "generated_at": "2026-11-08T18:13:24.636Z",
+      "active_count": 0,
+      "open_count": 0,
+      "acknowledged_count": 0,
+      "high_priority_count": 0,
+      "older_than_24h_count": 0,
+      "priority_queue": [],
+      "escalation_event_ids": [],
+      "handoff_status": "clear",
+      "summary": "All clear. No open or acknowledged incidents."
+    }
+  },
+  "unavailable_input_status": 500,
+  "invalid_action_status": 400,
+  "out_of_order_status": 409,
+  "repeated_action_status": 409
+}
