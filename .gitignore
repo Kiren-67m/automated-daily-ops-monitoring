@@ -19,3 +19,9 @@ Brazilian E-Commerce Public Dataset by Olist/olist_*.csv
 
 # Local generated workbooks
 *.xlsx
+
+# Local business input and monitor state
+.venv/
+data/
+var/
+run_state.json.lock

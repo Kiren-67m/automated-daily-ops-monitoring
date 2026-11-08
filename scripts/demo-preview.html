@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto · Daily operations demo</title>
+<style>
+:root{color-scheme:light;--ink:#12233a;--muted:#52647c;--line:#dee7f0;--navy:#172d48;--blue:#2d5986}
+*{box-sizing:border-box}body{margin:0;background:#eef4f9;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.48}
+main{max-width:1220px;margin:auto;padding:38px 24px 32px}.hero{background:linear-gradient(120deg,#14283f,#214666);padding:32px 34px;border-radius:17px;color:white}
+.eyebrow{font-size:.72rem;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:#a8d5ee}
+h1{font-size:clamp(2rem,5vw,3.1rem);margin:.2rem 0 .3rem;letter-spacing:-.04em}.hero p{margin:0;color:#dbe8f4}.facts{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}.facts span{border:1px solid #62839e;padding:4px 10px;border-radius:6px;font-size:.82rem;color:#edf7ff}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+.card{background:white;border:1px solid var(--line);border-radius:15px;padding:22px 20px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 5px 18px #172d4809}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:.83rem}
+.pill{padding:4px 9px;border-radius:999px;font-size:.74rem;font-weight:750;color:#165b42;background:#e4f3ec}.alert .pill{color:#982f29;background:#fae7e5}
+h2{font-size:1.48rem;letter-spacing:-.03em;margin:0}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.86rem;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:9px 5px;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child{text-align:left;padding-left:0}
+thead th{font-size:.7rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}.breach{color:#9e3129;font-weight:750}
+.clear{background:#edf7f2;color:#195d45;padding:10px 12px;border-radius:8px;margin:0;font-size:.86rem}
+.signals{list-style:none;padding:0;margin:0;display:grid;gap:6px}.signals li{border-radius:7px;background:#fff3f1;padding:6px 8px;font-size:.81rem}.signals b{color:#96372f;margin-right:4px;font-size:.72rem}
+footer{margin-top:auto;color:var(--muted);padding-top:4px;font-size:.8rem}code{overflow-wrap:anywhere}
+.note{background:#f8fbfe;border:1px solid var(--line);border-radius:11px;padding:14px 17px;color:#41556f;font-size:.85rem}.note p{margin:3px 0}
+a{color:#255780;text-underline-offset:3px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}}@media(max-width:450px){main{padding:14px 9px}.hero{padding:23px 15px}.card{padding:16px 10px}th,td{padding:7px 3px;font-size:.77rem}thead th{font-size:.65rem}}
+</style></head><body><main><header class="hero"><div class="eyebrow">Auto · End-to-end demo</div><h1>Daily operations monitor</h1>
+<p>Synthetic small online retailer · $timezone · $currency</p>
+<div class="facts"><span>$days completed business days</span><span>$orders orders</span>
+<span>$items line items</span><span>$payment_records payment records</span></div></header>
+<div class="grid">$normal_card$alert_card</div>
+<aside class="note">
+<p>The monitor compares each day with the prior seven calendar days. Revenue uses captured payments. Average order value divides revenue by all orders, including cancellations.</p>
+<p>A repeat trigger returned <code>$repeat_status</code>. The receiver recorded $deliveries webhook delivery.</p>
+<p><a href="normal-report.txt">Original daily report</a> · <a href="webhook-alert.json">Original webhook payload</a> · <a href="daily_ops_metrics.xlsx">42-day KPI workbook</a></p>
+</aside></main></body></html>

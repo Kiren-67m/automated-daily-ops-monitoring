@@ -1,0 +1,36 @@
+{
+  "run_time": "2026-11-08T07:03:34+00:00",
+  "mode": "live",
+  "date": "2026-11-07",
+  "status": "anomaly_detected",
+  "signals_count": 4,
+  "signals": [
+    {
+      "metric": "revenue",
+      "direction": "down",
+      "severity": "high",
+      "details": "Revenue -78% vs 7-day avg"
+    },
+    {
+      "metric": "orders_count",
+      "direction": "down",
+      "severity": "high",
+      "details": "Orders -51% vs 7-day avg"
+    },
+    {
+      "metric": "avg_order_value",
+      "direction": "down",
+      "severity": "high",
+      "details": "AOV -55% vs 7-day avg"
+    },
+    {
+      "metric": "canceled_orders",
+      "direction": "up",
+      "severity": "high",
+      "details": "Cancellations +300% vs 7-day avg"
+    }
+  ],
+  "summary": "Date: 2026-11-07 | Status: anomaly_detected\nOrders: 22 (avg 45.3) | Revenue: 446.76 (avg 2032.50)\nCanceled: 8 (avg 2.0) | AOV: 20.31 (avg 44.91)\nSignals:\n- revenue (down, high): Revenue -78% vs 7-day avg\n- orders_count (down, high): Orders -51% vs 7-day avg\n- avg_order_value (down, high): AOV -55% vs 7-day avg\n- canceled_orders (up, high): Cancellations +300% vs 7-day avg",
+  "event_id": "daily-ops:2026-11-07",
+  "timezone": "America/Chicago"
+}
